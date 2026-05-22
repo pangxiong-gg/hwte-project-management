@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Projects from './pages/Projects';
 import ProjectDetail from './pages/ProjectDetail';
+import CreateProject from './pages/CreateProject';
 import { useAuthStore } from './stores/authStore';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -30,6 +31,7 @@ export default function App() {
             <Route index element={<div>儀表板載入中...</div>} />
             <Route path="projects" element={<Projects />} />
             <Route path="projects/:id" element={<ProjectDetail />} />
+            <Route path="projects/create" element={<CreateProject />} />
             <Route path="users" element={<div>使用者管理</div>} />
             <Route path="settings" element={<div>系統設定</div>} />
           </Route>

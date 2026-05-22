@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Card, Tag, Button, Space, Select, Input } from 'antd';
-import { EyeOutlined, SearchOutlined } from '@ant-design/icons';
+import { EyeOutlined, SearchOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { projectApi } from '../services/api';
 
@@ -119,6 +119,7 @@ export default function Projects() {
       <Card title="專案列表" bordered={false}>
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>
           <Space wrap>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/projects/create')}>新增專案</Button>
             <Input
               placeholder="搜尋專案名稱"
               prefix={<SearchOutlined />}
