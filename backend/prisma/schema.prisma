@@ -1,0 +1,371 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =====================================================
+// Organization & User (多租戶核心)
+// =====================================================
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  code      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  divisions     Division[]
+  projects      Project[]
+  users         User[]
+  auditLogs     AuditLog[]
+}
+
+model Division {
+  id             String   @id @default(uuid())
+  name           String
+  code           String
+  orgId          String
+  parentId       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  organization   Organization @relation(fields: [orgId], references: [id])
+  parent         Division?    @relation("DivisionHierarchy", fields: [parentId], references: [id])
+  children       Division[]   @relation("DivisionHierarchy")
+  departments    Department[]
+  users          User[]
+}
+
+model Department {
+  id         String   @id @default(uuid())
+  name       String
+  code       String
+  divisionId String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  deletedAt  DateTime?
+
+  division   Division @relation(fields: [divisionId], references: [id])
+  teams      Team[]
+}
+
+model Team {
+  id           String   @id @default(uuid())
+  name         String
+  code         String
+  departmentId String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  department   Department @relation(fields: [departmentId], references: [id])
+  users        User[]
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String
+  password     String
+  orgId        String
+  divisionId   String?
+  teamId       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  organization Organization @relation(fields: [orgId], references: [id])
+  division      Division?    @relation(fields: [divisionId], references: [id])
+  team          Team?        @relation(fields: [teamId], references: [id])
+  roles        UserRole[]
+  auditLogs    AuditLog[]
+}
+
+// =====================================================
+// Auth & RBAC
+// =====================================================
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  permissions Permission[]
+  userRoles   UserRole[]
+}
+
+model Permission {
+  id         String   @id @default(uuid())
+  resource   String
+  action     String
+  roleId     String
+  createdAt  DateTime @default(now())
+
+  role       Role     @relation(fields: [roleId], references: [id])
+
+  @@unique([roleId, resource, action])
+}
+
+model UserRole {
+  id       String   @id @default(uuid())
+  userId   String
+  roleId   String
+  scope    String
+  scopeId  String?
+  createdAt DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id])
+  role     Role     @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId, scope, scopeId])
+}
+
+// =====================================================
+// HR Sync
+// =====================================================
+
+model HrSyncLog {
+  id          String   @id @default(uuid())
+  syncType    String
+  status      String
+  recordCount Int?
+  errorMsg    String?
+  startedAt   DateTime @default(now())
+  completedAt DateTime?
+}
+
+// =====================================================
+// Audit Log
+// =====================================================
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  entityType  String
+  entityId    String
+  action      String
+  oldValue    String?
+  newValue    String?
+  operatorId  String
+  operatorIp  String?
+  orgId       String
+  createdAt   DateTime @default(now())
+
+  organization Organization @relation(fields: [orgId], references: [id])
+  operator      User     @relation(fields: [operatorId], references: [id])
+}
+
+// =====================================================
+// Project Initiation (Phase 1)
+// =====================================================
+
+model Project {
+  id            String   @id @default(uuid())
+  name          String
+  code          String   @unique
+  type          String
+  status        String   @default("DRAFT")
+  orgId         String
+  pmId          String?
+  budget        Decimal?
+  startDate     DateTime?
+  endDate       DateTime?
+  description   String?
+  businessBackground String?
+  coreGoals     String?
+  stakeholders  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  organization Organization @relation(fields: [orgId], references: [id])
+  projectManager User?        @relation(fields: [pmId], references: [id])
+  feasibility   Feasibility?
+  charter       ProjectCharter?
+  milestones    Milestone[]
+  teams        ProjectTeam[]
+  requirements  Requirement[]
+  tasks        Task[]
+  approvals    Approval[]
+  documents    Document[]
+  auditLogs    AuditLog[]
+}
+
+model Feasibility {
+  id              String   @id @default(uuid())
+  projectId       String   @unique
+  businessReport  String?
+  technicalReport String?
+  costReport      String?
+  riskReport      String?
+  riskResponse    String?
+  status          String   @default("IN_PROGRESS")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project         Project @relation(fields: [projectId], references: [id])
+}
+
+model ProjectCharter {
+  id              String   @id @default(uuid())
+  projectId       String   @unique
+  charterDoc      String?
+  requirementBaseline String?
+  scheduleBaseline    String?
+  costBaseline        Decimal?
+  status          String   @default("DRAFT")
+  publishedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project         Project @relation(fields: [projectId], references: [id])
+}
+
+model Milestone {
+  id          String   @id @default(uuid())
+  projectId   String
+  name        String
+  description String?
+  dueDate     DateTime
+  deliverables String?
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project     Project @relation(fields: [projectId], references: [id])
+}
+
+model ProjectTeam {
+  id           String   @id @default(uuid())
+  projectId    String
+  userId       String
+  role         String
+  addedAt      DateTime @default(now())
+
+  project      Project @relation(fields: [projectId], references: [id])
+  user         User    @relation(fields: [userId], references: [id])
+
+  @@unique([projectId, userId])
+}
+
+// =====================================================
+// Approval Workflow
+// =====================================================
+
+model ApprovalWorkflow {
+  id          String   @id @default(uuid())
+  name        String
+  entityType  String
+  steps       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  approvals   Approval[]
+}
+
+model Approval {
+  id          String   @id @default(uuid())
+  workflowId   String
+  entityType  String
+  entityId    String
+  status      String   @default("PENDING")
+  currentStep Int      @default(0)
+  projectId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workflow    ApprovalWorkflow @relation(fields: [workflowId], references: [id])
+  records     ApprovalRecord[]
+  project     Project?         @relation(fields: [projectId], references: [id])
+}
+
+model ApprovalRecord {
+  id           String   @id @default(uuid())
+  approvalId   String
+  step         Int
+  approverId   String
+  decision     String
+  comments     String?
+  decidedAt    DateTime @default(now())
+
+  approval     Approval @relation(fields: [approvalId], references: [id])
+  approver     User     @relation(fields: [approverId], references: [id])
+}
+
+// =====================================================
+// Document Management
+// =====================================================
+
+model Document {
+  id          String   @id @default(uuid())
+  name        String
+  type        String
+  filePath    String
+  version     Int      @default(1)
+  projectId   String?
+  entityType  String?
+  entityId    String?
+  uploadedBy  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project     Project? @relation(fields: [projectId], references: [id])
+  uploader    User     @relation(fields: [uploadedBy], references: [id])
+  versions    DocumentVersion[]
+}
+
+model DocumentVersion {
+  id          String   @id @default(uuid())
+  documentId  String
+  version     Int
+  filePath    String
+  changes     String?
+  createdAt   DateTime @default(now())
+  createdBy   String
+
+  document    Document @relation(fields: [documentId], references: [id])
+  creator     User     @relation(fields: [createdBy], references: [id])
+}
+
+// =====================================================
+// Requirements (Phase 2)
+// =====================================================
+
+model Requirement {
+  id          String   @id @default(uuid())
+  projectId   String
+  title       String
+  description String?
+  priority    String   @default("MEDIUM")
+  status      String   @default("DRAFT")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project     Project @relation(fields: [projectId], references: [id])
+}
+
+// =====================================================
+// Tasks
+// =====================================================
+
+model Task {
+  id          String   @id @default(uuid())
+  projectId   String
+  title       String
+  description String?
+  status      String   @default("TODO")
+  assigneeId  String?
+  dueDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project     Project @relation(fields: [projectId], references: [id])
+  assignee    User?   @relation(fields: [assigneeId], references: [id])
+}
