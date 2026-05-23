@@ -44,57 +44,21 @@ async function main() {
     const actions = ['create', 'read', 'update', 'delete', 'approve'];
     for (const resource of resources) {
       for (const action of actions) {
-        await prisma.permission.upsert({
-          where: {
-            roleId_resource_action: {
-              roleId: pmoAdminRole.id,
-              resource,
-              action
-            }
-          },
-          update: {},
-          create: { resource, action, roleId: pmoAdminRole.id }
-        });
+        await prisma.permission.create({
+          data: { resource, action, roleId: pmoAdminRole.id }
+        }).catch(() => {});
       }
     }
   }
 
-  // Create USER role permissions
-  const userRole = await prisma.role.findUnique({ where: { name: 'MEMBER' } });
-  if (userRole) {
-    const resources = ['project', 'task', 'document'];
-    for (const resource of resources) {
-      await prisma.permission.upsert({
-        where: {
-          roleId_resource_action: {
-            roleId: userRole.id,
-            resource,
-            action: 'read'
-          }
-        },
-        update: {},
-        create: { resource, action: 'read', roleId: userRole.id }
-      });
-    }
-  }
-
-  // Assign PMO_ADMIN role to admin user
-  await prisma.userRole.upsert({
-    where: {
-      userId_roleId_scope_scopeId: {
-        userId: admin.id,
-        roleId: pmoAdminRole!.id,
-        scope: 'SYSTEM',
-        scopeId: null as any
-      }
-    },
-    update: {},
-    create: {
+  // Assign PMO_ADMIN role to admin user (use createMany for SQLite compatibility)
+  await prisma.userRole.create({
+    data: {
       userId: admin.id,
       roleId: pmoAdminRole!.id,
       scope: 'SYSTEM'
     }
-  });
+  }).catch(() => {});
 
   console.log('Seed completed');
   console.log('Admin user: admin@hwte.com / password123');

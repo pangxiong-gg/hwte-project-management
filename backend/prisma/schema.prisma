@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -85,6 +85,12 @@ model User {
   team          Team?        @relation(fields: [teamId], references: [id])
   roles        UserRole[]
   auditLogs    AuditLog[]
+  uploadedDocuments Document[] @relation("UploadedBy")
+  createdDocumentVersions DocumentVersion[] @relation("CreatedBy")
+  assignedTasks Task[] @relation("AssignedTo")
+  approvalRecords ApprovalRecord[] @relation("Approver")
+  managedProjects Project[] @relation("ManagedProjects")
+  projectTeamMembers ProjectTeam[] @relation("ProjectTeams")
 }
 
 // =====================================================
@@ -160,6 +166,8 @@ model AuditLog {
 
   organization Organization @relation(fields: [orgId], references: [id])
   operator      User     @relation(fields: [operatorId], references: [id])
+  project       Project? @relation("ProjectAuditLogs", fields: [projectId], references: [id])
+  projectId     String?
 }
 
 // =====================================================
@@ -174,7 +182,7 @@ model Project {
   status        String   @default("DRAFT")
   orgId         String
   pmId          String?
-  budget        Decimal?
+  budget        Float?
   startDate     DateTime?
   endDate       DateTime?
   description   String?
@@ -186,7 +194,7 @@ model Project {
   deletedAt     DateTime?
 
   organization Organization @relation(fields: [orgId], references: [id])
-  projectManager User?        @relation(fields: [pmId], references: [id])
+  projectManager User?        @relation("ManagedProjects", fields: [pmId], references: [id])
   feasibility   Feasibility?
   charter       ProjectCharter?
   milestones    Milestone[]
@@ -195,7 +203,7 @@ model Project {
   tasks        Task[]
   approvals    Approval[]
   documents    Document[]
-  auditLogs    AuditLog[]
+  auditLogs    AuditLog[] @relation("ProjectAuditLogs")
 }
 
 model Feasibility {
@@ -219,7 +227,7 @@ model ProjectCharter {
   charterDoc      String?
   requirementBaseline String?
   scheduleBaseline    String?
-  costBaseline        Decimal?
+  costBaseline        Float?
   status          String   @default("DRAFT")
   publishedAt     DateTime?
   createdAt       DateTime @default(now())
@@ -250,7 +258,7 @@ model ProjectTeam {
   addedAt      DateTime @default(now())
 
   project      Project @relation(fields: [projectId], references: [id])
-  user         User    @relation(fields: [userId], references: [id])
+  user         User    @relation("ProjectTeams", fields: [userId], references: [id])
 
   @@unique([projectId, userId])
 }
@@ -296,7 +304,7 @@ model ApprovalRecord {
   decidedAt    DateTime @default(now())
 
   approval     Approval @relation(fields: [approvalId], references: [id])
-  approver     User     @relation(fields: [approverId], references: [id])
+  approver     User     @relation("Approver", fields: [approverId], references: [id])
 }
 
 // =====================================================
@@ -317,7 +325,7 @@ model Document {
   updatedAt   DateTime @updatedAt
 
   project     Project? @relation(fields: [projectId], references: [id])
-  uploader    User     @relation(fields: [uploadedBy], references: [id])
+  uploader    User     @relation("UploadedBy", fields: [uploadedBy], references: [id])
   versions    DocumentVersion[]
 }
 
@@ -331,7 +339,7 @@ model DocumentVersion {
   createdBy   String
 
   document    Document @relation(fields: [documentId], references: [id])
-  creator     User     @relation(fields: [createdBy], references: [id])
+  creator     User     @relation("CreatedBy", fields: [createdBy], references: [id])
 }
 
 // =====================================================
@@ -367,5 +375,5 @@ model Task {
   updatedAt   DateTime @updatedAt
 
   project     Project @relation(fields: [projectId], references: [id])
-  assignee    User?   @relation(fields: [assigneeId], references: [id])
+  assignee    User?   @relation("AssignedTo", fields: [assigneeId], references: [id])
 }
